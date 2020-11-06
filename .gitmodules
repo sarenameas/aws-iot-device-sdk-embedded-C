@@ -3,22 +3,22 @@
 	url = https://github.com/ThrowTheSwitch/CMock
 [submodule "libraries/standard/coreMQTT"]
 	path = libraries/standard/coreMQTT
-	url = https://github.com/FreeRTOS/coreMQTT.git
+	url = https://github.com/sarenameas/coreMQTT.git
 [submodule "libraries/standard/coreHTTP"]
 	path = libraries/standard/coreHTTP
-	url = https://github.com/FreeRTOS/coreHTTP.git
+	url = https://github.com/sarenameas/coreHTTP.git
 [submodule "libraries/standard/coreJSON"]
 	path = libraries/standard/coreJSON
-	url = https://github.com/FreeRTOS/coreJSON.git
+	url = https://github.com/sarenameas/coreJSON.git
 [submodule "libraries/aws/device-shadow-for-aws-iot-embedded-sdk"]
 	path = libraries/aws/device-shadow-for-aws-iot-embedded-sdk
-	url = https://github.com/aws/device-shadow-for-aws-iot-embedded-sdk.git
+	url = https://github.com/sarenameas/device-shadow-for-aws-iot-embedded-sdk.git
 [submodule "libraries/aws/jobs-for-aws-iot-embedded-sdk"]
 	path = libraries/aws/jobs-for-aws-iot-embedded-sdk
-	url = https://github.com/aws/jobs-for-aws-iot-embedded-sdk.git
+	url = https://github.com/sarenameas/jobs-for-aws-iot-embedded-sdk.git
 [submodule "libraries/aws/device-defender-for-aws-iot-embedded-sdk"]
 	path = libraries/aws/device-defender-for-aws-iot-embedded-sdk
-	url = https://github.com/aws/device-defender-for-aws-iot-embedded-sdk.git
+	url = https://github.com/sarenameas/device-defender-for-aws-iot-embedded-sdk.git
 [submodule "libraries/standard/corePKCS11"]
 	path = libraries/standard/corePKCS11
-	url = https://github.com/FreeRTOS/corePKCS11.git
+	url = https://github.com/sarenameas/corePKCS11.git
