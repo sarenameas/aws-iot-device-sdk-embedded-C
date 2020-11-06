@@ -15,6 +15,26 @@ CSDK_LIBRARY_DIRS = [ os.path.join("libraries", "aws"),
 CSDK_BRANCHES = [ "master",
                   "v4_beta_deprecated"]
 
+def run_cmd(cmd):
+    """
+    Execute the input command on the shell.
+    """
+    print(f"Executing command: {cmd}")
+    try:
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            shell=True,
+            encoding="utf-8",
+            check=True,
+            timeout=180,
+        )
+        return result.stdout
+    except subprocess.CalledProcessError as e:
+        result = e.stdout
+        return result
+
 
 # TODO: Create rollback function.
 
@@ -26,7 +46,6 @@ def validate_manifest(csdk_root, versions):
         versions (dict): A dictionary containing the versions of each library.
         Please see tools/release/config.yml.
     """
-    # Parse manifest.yml
     with open(os.path.join(csdk_root,"manifest.yml")) as manifest_file:
         manifest = yaml.load(manifest_file, Loader=yaml.FullLoader)
 
@@ -34,12 +53,12 @@ def validate_manifest(csdk_root, versions):
         found = filter(lambda dep: dep["name"].casefold() == library, manifest["dependencies"])
         found = list(found)
         if len(found) != 1:
-            raise Exception(f"Invalid manifest.yml. Found {len(found)} occurrences of required {library}.")
+            raise Exception(f"Invalid manifest.yml. Found {len(found)} occurrences of required library {library}.")
 
-        manifest_dep_version = found[0]["version"]
-
-        if manifest_dep_version != versions[library]:
-            raise Exception(f"Invalid version {manifest_dep_version} for {library}")
+        dep_version = found[0]["version"]
+        dep_name = found[0]["name"]
+        if dep_version != versions[library]:
+            raise Exception(f"Invalid manifest.yml. Invalid version {dep_version} for {dep_name}")
 
 def main():
     """
@@ -49,7 +68,6 @@ def main():
     # Options:
     parser = argparse.ArgumentParser(description="Perform CSDK Release activities.")
     parser.add_argument("-r", "--root", action="store", required=True, dest="root", help="CSDK repo root path.")
-    # TODO: create release-candidate?
 
     args = parser.parse_args()
     csdk_root = os.path.abspath(args.root)
@@ -61,10 +79,14 @@ def main():
     # Verify that Manifest.yml has all libraries and their versions.
     validate_manifest(csdk_root, configs["versions"])
 
-    # Parse for the last version and the current version. (using manifest.yml)
-
-
     # Create and checkout the release-candidate branch. Push to origin.
+    if run_cmd("git ls-remote --heads git@github.com:aws/aws-iot-device-sdk-embedded-C.git release-candidate") == "":
+        run_cmd("git fetch git@github.com:aws/aws-iot-device-sdk-embedded-C.git master:release_master")
+        run_cmd("git checkout release_master")
+        run_cmd("git checkout -b release-candidate")
+        run_cmd("git push git@github.com:aws/aws-iot-device-sdk-embedded-C.git release-candidate")
+    else:
+        print("Branch release-candidate exists on remote origin.")
 
     # Update the library submodules to the latest. A PR will need to be created.
 
