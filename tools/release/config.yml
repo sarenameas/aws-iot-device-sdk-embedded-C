@@ -1,0 +1,12 @@
+# Your developer token for using the Github API.
+access_token:
+
+# The new versions of each library.
+csdk_version:
+versions:
+  coremqtt:
+  corejson:
+  device-shadow-for-aws-iot-embedded-sdk:
+  corehttp:
+  device-defender-for-aws-iot-embedded-sdk:
+  jobs-for-aws-iot-embedded-sdk:
