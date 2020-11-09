@@ -145,6 +145,9 @@ def main():
     jenkins_req = requests.get(f"{JENKINS_API_URL}/{JENKINS_CSDK_TESTS_PATH}", auth=HTTPBasicAuth(JENKINS_USERNAME, JENKINS_PASSWORD))
     if jenkins_req.json()["result"] != "SUCCESS":
         raise Exception(f"Jenkins job {JENKINS_API_URL}/{JENKINS_CSDK_TESTS_PATH} failed.")
+
+    
+
     # Tag each of the library repos.
 
     # Verify submodules point to each of the new tags.

@@ -4,11 +4,11 @@ jenkins_username:
 jenkins_password:
 
 # The new versions of each library.
-csdk_version:
+csdk_version: "202011.00"
 versions:
-  coremqtt:
-  corejson:
-  device-shadow-for-aws-iot-embedded-sdk:
-  corehttp:
-  device-defender-for-aws-iot-embedded-sdk:
-  jobs-for-aws-iot-embedded-sdk:
+  coremqtt: "v1.0.1"
+  corejson: "v2.0.0"
+  device-shadow-for-aws-iot-embedded-sdk: "v1.0.1"
+  corehttp: "v1.0.0"
+  device-defender-for-aws-iot-embedded-sdk: "v1.0.0"
+  jobs-for-aws-iot-embedded-sdk: "v1.0.0"
