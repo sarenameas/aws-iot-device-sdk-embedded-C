@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 import subprocess
-import sys
 import argparse
 import os
-import zipfile
 import yaml
 import requests
+import logging
 from requests.auth import HTTPBasicAuth
 
 # Directories where the library submodules exist.
@@ -14,46 +13,33 @@ CSDK_LIBRARY_DIRS = [os.path.join("libraries", "aws"), os.path.join("library", "
 # The only branches allowed on the CSDK repo.
 CSDK_BRANCHES = ["master", "v4_beta_deprecated"]
 
-
+# CSDK organization and repo constants
 CSDK_ORG = "sarenameas"
 CSDK_REPO = "aws-iot-device-sdk-embedded-c"
 
+# Github API global
 GITHUB_API_URL = "https://api.github.com"
 GITHUB_ACCESS_TOKEN = ""
 GITHUB_AUTH_HEADER = {"Authorization": "token %s" % GITHUB_ACCESS_TOKEN, "Accept": "application/vnd.github.v3+json"}
 
+# Jenkins API globals
 JENKINS_API_URL = "https://amazon-freertos-ci.corp.amazon.com/"
 JENKINS_USERNAME = ""
 JENKINS_PASSWORD = ""
-JENKINS_CSDK_DEMOS_PATH = "/job/csdk/job/demo_pipeline/lastCompletedBuild/api/json"
-JENKINS_CSDK_TESTS_PATH = "/job/csdk/job/nightly/lastCompletedBuild/api/json"
+JENKINS_CSDK_DEMOS_PATH = "job/csdk/job/demo_pipeline/lastCompletedBuild"
+JENKINS_CSDK_TESTS_PATH = "job/csdk/job/nightly/lastCompletedBuild"
+JENKINS_API_PATH = "api/json"
+
+# Errors found in this run.
+errors = 0
+
+def log_error(error_log):
+    global errors
+    log_error(error_log)
+    errors = errors + 1
 
 
-def run_cmd(cmd):
-    """
-    Execute the input command on the shell.
-    """
-    print(f"Executing command: {cmd}")
-    try:
-        result = subprocess.run(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            shell=True,
-            encoding="utf-8",
-            check=True,
-            timeout=180,
-        )
-        return result.stdout
-    except subprocess.CalledProcessError as e:
-        result = e.stdout
-        return result
-
-
-# TODO: Create rollback function.
-
-
-def validate_manifest(manifest, csdk_version, lib_versions):
+def validate_manifest(manifest, csdk_version, lib_versions) -> list:
     """
     Validates the manifest.yml file at the root of the CSDK.
     Args:
@@ -61,25 +47,22 @@ def validate_manifest(manifest, csdk_version, lib_versions):
         csdk_versions (str): The new version of the CSDK repo.
         lib_versions (dict): A dictionary containing the new versions of each library.
         Please see tools/release/config.yml.
+    Returns the list of errors.
     """
-
     manifest_version = manifest["version"]
     if manifest_version != csdk_version:
-        raise Exception(f"FAIL: Invalid manifest.yml. CSDK version {manifest_version} should be {csdk_version}.")
+        log_error(f"Invalid manifest.yml. CSDK version {manifest_version} should be {csdk_version}.")
 
     for library in lib_versions.keys():
         found = filter(lambda dep: dep["name"].casefold() == library, manifest["dependencies"])
         found = list(found)
         if len(found) != 1:
-            raise Exception(
-                f"FAIL: Invalid manifest.yml. Found {len(found)} occurrences of required library {library}."
-            )
-
-        dep_version = found[0]["version"]
-        dep_name = found[0]["name"]
-        if dep_version != lib_versions[library]:
-            raise Exception(f"FAIL:Invalid manifest.yml. Invalid version {dep_version} for {dep_name}")
-    print("PASS: manifest.yml contains all libraries and their versions.")
+            log_error(f"Invalid manifest.yml. Found {len(found)} occurrences of required library {library}.")
+        else:
+            dep_version = found[0]["version"]
+            dep_name = found[0]["name"]
+            if dep_version != lib_versions[library]:
+                log_error(f"Invalid manifest.yml. Invalid version {dep_version} for {dep_name}")
 
 
 def validate_checks(repo_paths):
@@ -92,10 +75,10 @@ def validate_checks(repo_paths):
         git_req = requests.get(f"{GITHUB_API_URL}/{repo_path}/commits/master/check-runs", headers=GITHUB_AUTH_HEADER)
         # The first item is the latest commit on master.
         if git_req.json()["check_runs"][0]["conclusion"] != "success":
-            raise Exception(f"The GHA status checks failed for {repo}.")
+            log_error(f"The GHA status checks failed for {repo_path}.")
         git_req = requests.get(f"{GITHUB_API_URL}/{repo_path}/commits/master/status", headers=GITHUB_AUTH_HEADER)
         if git_req.json()["state"] != "success":
-            raise Exception(f"The CBMC status checks failed for {repo}.")
+            log_error(f"The CBMC status checks failed for {repo_path}.")
 
 
 def validate_ci():
@@ -103,15 +86,17 @@ def validate_ci():
     Validates that all CSDK jobs in the Jenkins CI passed.
     """
     jenkins_req = requests.get(
-        f"{JENKINS_API_URL}/{JENKINS_CSDK_DEMOS_PATH}", auth=HTTPBasicAuth(JENKINS_USERNAME, JENKINS_PASSWORD)
+        f"{JENKINS_API_URL}/{JENKINS_CSDK_DEMOS_PATH}/{JENKINS_API_PATH}",
+        auth=HTTPBasicAuth(JENKINS_USERNAME, JENKINS_PASSWORD),
     )
     if jenkins_req.json()["result"] != "SUCCESS":
-        raise Exception(f"Jenkins job {JENKINS_API_URL}/{JENKINS_CSDK_DEMOS_PATH} failed.")
+        log_error(f"Jenkins job failed: {JENKINS_API_URL}/{JENKINS_CSDK_DEMOS_PATH}.")
     jenkins_req = requests.get(
-        f"{JENKINS_API_URL}/{JENKINS_CSDK_TESTS_PATH}", auth=HTTPBasicAuth(JENKINS_USERNAME, JENKINS_PASSWORD)
+        f"{JENKINS_API_URL}/{JENKINS_CSDK_TESTS_PATH}/{JENKINS_API_PATH}",
+        auth=HTTPBasicAuth(JENKINS_USERNAME, JENKINS_PASSWORD),
     )
     if jenkins_req.json()["result"] != "SUCCESS":
-        raise Exception(f"Jenkins job {JENKINS_API_URL}/{JENKINS_CSDK_TESTS_PATH} failed.")
+        log_error(f"Jenkins job failed: {JENKINS_API_URL}/{JENKINS_CSDK_TESTS_PATH}.")
 
 
 def validate_branches(repo_paths):
@@ -125,29 +110,31 @@ def validate_branches(repo_paths):
         valid_branches = ["master"]
         if repo_path == "{CSDK_ORG}/{CSDK_REPO}":
             valid_branches.append("v4_beta_deprecated")
-        if len(git_req) != len(valid_branches):
-            raise Exception(f"Invalid number of branches {len(git_req)} in {repo_path}.")
         for branch in git_req.json():
             branch_name = branch["name"]
             if branch_name not in valid_branches:
-                raise Exception(f"Invalid branch {branch_name} found in {repo_path}.")
+                log_error(f"Invalid branch {branch_name} found in {repo_path}.")
 
 
 def validate_release_candidate_branches():
     """
     Verifies there are no pending PRs to the release candidate branch.
     """
-    git_req = requests.get(f"{GITHUB_API_URL}/{CSDK_ORG}/{CSDK_REPO}/pulls?base=release_candidate", headers=GITHUB_AUTH_HEADER)
-    if(len(git_req.json()) > 0):
-        None
+    git_req = requests.get(
+        f"{GITHUB_API_URL}/{CSDK_ORG}/{CSDK_REPO}/pulls?base=release-candidate", headers=GITHUB_AUTH_HEADER
+    )
+    for pr in git_req.json():
+        pr_url = pr["url"]
+        log_error(f"Pull request to release-candidate {pr_url}.")
+
 
 def main():
     """
     Performs pre-release validation of the CSDK and the library spoke repos.
     """
+    # Parse the input arguments to this script.
     parser = argparse.ArgumentParser(description="Perform CSDK Release activities.")
     parser.add_argument("-r", "--root", action="store", required=True, dest="root", help="CSDK repo root path.")
-
     args = parser.parse_args()
     csdk_root = os.path.abspath(args.root)
 
@@ -173,6 +160,9 @@ def main():
     JENKINS_USERNAME = configs["jenkins_username"]
     JENKINS_PASSWORD = configs["jenkins_password"]
 
+    # Create results file to write to.
+    logging.basicConfig(filename="errors.log", filempde="w", level=logging.ERROR)
+
     # Verify that Manifest.yml has all libraries and their versions.
     validate_manifest(manifest, configs["csdk_version"], configs["versions"])
 
@@ -187,6 +177,11 @@ def main():
 
     # Verify there are no pending PRs to the release-candidate branch.
     validate_release_candidate_branches()
+
+    if errors > 0:
+        print("Release verification failed please see results.log")
+    else:
+        print("All release verification passed.")
 
 
 if __name__ == "__main__":
