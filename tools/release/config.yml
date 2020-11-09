@@ -1,5 +1,7 @@
 # Your developer token for using the Github API.
-access_token:
+github_access_token:
+jenkins_username:
+jenkins_password:
 
 # The new versions of each library.
 csdk_version:
