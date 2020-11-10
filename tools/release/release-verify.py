@@ -8,13 +8,13 @@ import logging
 from requests.auth import HTTPBasicAuth
 
 # Directories where the library submodules exist.
-CSDK_LIBRARY_DIRS = [os.path.join("libraries", "aws"), os.path.join("library", "standard")]
+CSDK_LIBRARY_DIRS = ["libraries/aws", "libraries/standard"]
 
 # The only branches allowed on the CSDK repo.
 CSDK_BRANCHES = ["master", "v4_beta_deprecated"]
 
 # CSDK organization and repo constants
-CSDK_ORG = "aws"
+CSDK_ORG = "sarenameas"
 CSDK_REPO = "aws-iot-device-sdk-embedded-c"
 
 # Github API global
@@ -73,16 +73,47 @@ def validate_checks(repo_paths):
     Args:
         repo_paths (dict): Paths to all library repos in the CSDK, including their org.
     """
-    for repo_path in repo_paths:
+    for library_dir in CSDK_LIBRARY_DIRS:
+        # Get the submodules in the library directory.
         git_req = requests.get(
-            f"{GITHUB_API_URL}/repos/{repo_path}/commits/master/check-runs", headers=GITHUB_AUTH_HEADER
+            f"{GITHUB_API_URL}/repos/{CSDK_ORG}/{CSDK_REPO}/contents/{library_dir}?ref=release-candidate",
+            headers=GITHUB_AUTH_HEADER,
         )
-        # The first item is the latest commit on master.
-        if git_req.json()["check_runs"][0]["conclusion"] != "success":
-            log_error(f"The GHA status checks failed for {repo_path}.")
-        git_req = requests.get(f"{GITHUB_API_URL}/repos/{repo_path}/commits/master/status", headers=GITHUB_AUTH_HEADER)
-        if git_req.json()["state"] != "success":
-            log_error(f"The CBMC status checks failed for {repo_path}.")
+        # A 404 status code means the branch doesn't exist.
+        if git_req.status_code == 404:
+            log_error(
+                "The release-candidate branch does not exist in the CSDK. Please create the release-candidate branch."
+            )
+            break
+        else:
+            # For each library submodule in this directory get the status checks results.
+            for library in git_req.json():
+                library_name = library["name"]
+                # Get the commit SHA of the branch currently in release-candidate.
+                git_req = requests.get(
+                    f"{GITHUB_API_URL}/repos/{CSDK_ORG}/{CSDK_REPO}/contents/{library_dir}/{library_name}?ref=release-candidate",
+                    headers=GITHUB_AUTH_HEADER,
+                )
+                commit_sha = git_req.json()["sha"]
+                # Get the organization of this repo
+                html_url = git_req.json()["html_url"]
+                start_index = html_url.find(".com/") + len(".com/")
+                end_index = html_url.find("/tree")
+                repo_path = html_url[start_index:end_index]
+                # Get the status of the CBMC checks
+                git_req = requests.get(
+                    f"{GITHUB_API_URL}/repos/{repo_path}/commits/{commit_sha}/status", headers=GITHUB_AUTH_HEADER
+                )
+                if git_req.json()["state"] != "success":
+                    log_error(f"The CBMC status checks failed for {html_url}.")
+                # Get the status of the GHA checks
+                git_req = requests.get(
+                    f"{GITHUB_API_URL}/repos/{repo_path}/commits/{commit_sha}/check-runs", headers=GITHUB_AUTH_HEADER
+                )
+                for check_run in git_req.json()["check_runs"]:
+                    if check_run["conclusion"] != "success":
+                        check_run_name = check_run["name"]
+                        log_error(f"The GHA {check_run_name} check failed for {html_url}.")
 
 
 def validate_ci():
