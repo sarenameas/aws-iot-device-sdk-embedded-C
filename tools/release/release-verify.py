@@ -14,10 +14,11 @@ CSDK_LIBRARY_DIRS = ["libraries/aws", "libraries/standard"]
 CSDK_BRANCHES = ["master", "v4_beta_deprecated"]
 
 # CSDK organization and repo constants
-CSDK_ORG = "sarenameas"
+CSDK_ORG = "aws"
 CSDK_REPO = "aws-iot-device-sdk-embedded-c"
 
-# Github API global
+# Github API global. The Github API us used instead of pyGithub because some
+# checks are not available yet in the packet.
 GITHUB_API_URL = "https://api.github.com"
 GITHUB_ACCESS_TOKEN = ""
 GITHUB_AUTH_HEADER = {"Authorization": "token {}", "Accept": "application/vnd.github.v3+json"}
