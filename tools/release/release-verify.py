@@ -15,12 +15,11 @@ CSDK_LIBRARY_DIRS = ["libraries/aws", "libraries/standard"]
 CSDK_ORG = "aws"
 CSDK_REPO = "aws-iot-device-sdk-embedded-c"
 
-# Github API global. The Github API us used instead of pyGithub because some
+# Github API global. The Github API is used instead of pyGithub because some
 # checks are not available yet in the packet.
 GITHUB_API_URL = "https://api.github.com"
 GITHUB_ACCESS_TOKEN = ""
-GITHUB_AUTH_HEADER = {"Authorization": "token {}", 
-                      "Accept": "application/vnd.github.v3+json"}
+GITHUB_AUTH_HEADER = {"Authorization": "token {}", "Accept": "application/vnd.github.v3+json"}
 
 # Jenkins API globals
 JENKINS_API_URL = "https://amazon-freertos-ci.corp.amazon.com"
@@ -170,6 +169,37 @@ def validate_release_candidate_branch():
         log_error(f"Pull request to release-candidate {pr_url}.")
 
 
+def get_configs(args) -> (dict, str):
+    """
+    Retrieve configs.yml into a dictionary and get the csdk_root from the the
+    input user args.
+    Args:
+        args(Namespace) User argument namespace.
+    """
+    csdk_root = os.path.abspath(args.root)
+    with open(os.path.join(csdk_root, "tools", "release", "config.yml")) as config_file:
+        configs = yaml.load(config_file, Loader=yaml.FullLoader)
+    configs["disable_jenkins_server_verify"] = args.disable_jenkins_server_verify
+    return (configs, csdk_root)
+
+
+def get_manifest(csdk_root) -> (dict, list):
+    """
+    Retrieve manifest.yml into a dictionary. From the manifest.yml we also get
+    the org/repo of each library.
+    Args:
+        csdk_root(str): The absolute path 
+    """
+    with open(os.path.join(csdk_root, "manifest.yml")) as manifest_file:
+        manifest = yaml.load(manifest_file, Loader=yaml.FullLoader)
+    repo_paths = []
+    for dep in manifest["dependencies"]:
+        dep_url = dep["repository"]["url"]
+        repo_paths.append(re.search("(?<=\.com/)(.*)", dep_url).group(0))
+    repo_paths.append(f"{CSDK_ORG}/{CSDK_REPO}")
+    return (manifest, repo_paths)
+
+
 def set_globals(configs):
     """
     Set global variables used in this script.
@@ -192,9 +222,9 @@ def set_globals(configs):
     JENKINS_SERVER_VERIFY = False if configs["disable_jenkins_server_verify"] else True
 
 
-def main():
+def parse_arguments() -> argparse.Namespace:
     """
-    Performs pre-release validation of the CSDK and the library spoke repos.
+    Parse the input user arguments and return a Namespace.
     """
     # Parse the input arguments to this script.
     parser = argparse.ArgumentParser(description="Perform CSDK Release activities.")
@@ -207,22 +237,21 @@ def main():
         dest="disable_jenkins_server_verify",
         help="Disable server verification for the Jenkins API calls if your system doesn't have the certificate in its store.",
     )
-    args = parser.parse_args()
-    csdk_root = os.path.abspath(args.root)
+    return parser.parse_args()
 
-    # Parse the input config.yml
-    with open(os.path.join(csdk_root, "tools", "release", "config.yml")) as config_file:
-        configs = yaml.load(config_file, Loader=yaml.FullLoader)
-    configs["disable_jenkins_server_verify"] = args.disable_jenkins_server_verify
 
-    # Parse the manifest.yml
-    with open(os.path.join(csdk_root, "manifest.yml")) as manifest_file:
-        manifest = yaml.load(manifest_file, Loader=yaml.FullLoader)
-    repo_paths = []
-    for dep in manifest["dependencies"]:
-        dep_url = dep["repository"]["url"]
-        repo_paths.append(re.search("(?<=\.com/)(.*)", dep_url).group(0))
-    repo_paths.append(f"{CSDK_ORG}/{CSDK_REPO}")
+def main():
+    """
+    Performs pre-release validation of the CSDK and the library spoke repos.
+    """
+
+    args = parse_arguments()
+
+    # Parse the input config.yml and args for the CSDK root.
+    (configs, csdk_root) = get_configs(args)
+
+    # Parse the manifest.yml for org/repo paths.
+    (manifest, repo_paths) = get_manifest(csdk_root)
 
     # Set the authentication variables.
     set_globals(configs)
