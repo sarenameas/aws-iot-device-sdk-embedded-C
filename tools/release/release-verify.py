@@ -74,6 +74,7 @@ def validate_checks(repo_paths):
     Args:
         repo_paths (dict): Paths to all library repos in the CSDK, including their org.
     """
+    docs_file = open("docs_to_review.txt", "w+")
     for library_dir in CSDK_LIBRARY_DIRS:
         # Get the submodules in the library directory.
         git_req = requests.get(
@@ -88,16 +89,13 @@ def validate_checks(repo_paths):
             break
         else:
             # For each library submodule in this directory get the status checks results.
+
             for library in git_req.json():
                 library_name = library["name"]
                 # Get the commit SHA of the branch currently in release-candidate.
-                git_req = requests.get(
-                    f"{GITHUB_API_URL}/repos/{CSDK_ORG}/{CSDK_REPO}/contents/{library_dir}/{library_name}?ref=release-candidate",
-                    headers=GITHUB_AUTH_HEADER,
-                )
-                commit_sha = git_req.json()["sha"]
+                commit_sha = library["sha"]
                 # Get the organization of this repo
-                html_url = git_req.json()["html_url"]
+                html_url = library["html_url"]
                 start_index = html_url.find(".com/") + len(".com/")
                 end_index = html_url.find("/tree")
                 repo_path = html_url[start_index:end_index]
@@ -115,6 +113,13 @@ def validate_checks(repo_paths):
                     if check_run["conclusion"] != "success":
                         check_run_name = check_run["name"]
                         log_error(f"The GHA {check_run_name} check failed for {html_url}.")
+
+                # Collect the HTML URLS for reviewing the docs.
+                html_url = html_url.split(commit_sha)[0] + "master"
+                docs_file.write(f"{library_name}\n")
+                docs_file.write(f"{html_url}/README.md\n")
+                docs_file.write(f"{html_url}/CHANGELOG.md\n\n")
+    docs_file.close()
 
 
 def validate_ci():
