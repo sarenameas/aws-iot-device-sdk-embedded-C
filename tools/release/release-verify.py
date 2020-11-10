@@ -6,12 +6,10 @@ import yaml
 import requests
 import logging
 from requests.auth import HTTPBasicAuth
+import re
 
 # Directories where the library submodules exist.
 CSDK_LIBRARY_DIRS = ["libraries/aws", "libraries/standard"]
-
-# The only branches allowed on the CSDK repo.
-CSDK_BRANCHES = ["master", "v4_beta_deprecated"]
 
 # CSDK organization and repo constants
 CSDK_ORG = "aws"
@@ -21,7 +19,8 @@ CSDK_REPO = "aws-iot-device-sdk-embedded-c"
 # checks are not available yet in the packet.
 GITHUB_API_URL = "https://api.github.com"
 GITHUB_ACCESS_TOKEN = ""
-GITHUB_AUTH_HEADER = {"Authorization": "token {}", "Accept": "application/vnd.github.v3+json"}
+GITHUB_AUTH_HEADER = {"Authorization": "token {}", 
+                      "Accept": "application/vnd.github.v3+json"}
 
 # Jenkins API globals
 JENKINS_API_URL = "https://amazon-freertos-ci.corp.amazon.com"
@@ -88,17 +87,15 @@ def validate_checks(repo_paths):
             )
             break
         else:
-            # For each library submodule in this directory get the status checks results.
-
+            # For each library submodule in this directory, get the status checks results and docs to review.
             for library in git_req.json():
                 library_name = library["name"]
                 # Get the commit SHA of the branch currently in release-candidate.
                 commit_sha = library["sha"]
                 # Get the organization of this repo
                 html_url = library["html_url"]
-                start_index = html_url.find(".com/") + len(".com/")
-                end_index = html_url.find("/tree")
-                repo_path = html_url[start_index:end_index]
+                repo_path = re.search("(?<=\.com/)(.*)(?=/tree)", html_url).group(0)
+
                 # Get the status of the CBMC checks
                 git_req = requests.get(
                     f"{GITHUB_API_URL}/repos/{repo_path}/commits/{commit_sha}/status", headers=GITHUB_AUTH_HEADER
@@ -174,6 +171,9 @@ def validate_release_candidate_branch():
 
 
 def set_globals(configs):
+    """
+    Set global variables used in this script.
+    """
     global GITHUB_ACCESS_TOKEN
     global GITHUB_AUTH_HEADER
     global JENKINS_USERNAME
@@ -221,13 +221,13 @@ def main():
     repo_paths = []
     for dep in manifest["dependencies"]:
         dep_url = dep["repository"]["url"]
-        repo_paths.append(dep_url[dep_url.find(".com/") + len(".com/") :])
+        repo_paths.append(re.search("(?<=\.com/)(.*)", dep_url).group(0))
     repo_paths.append(f"{CSDK_ORG}/{CSDK_REPO}")
 
-    # Get the authentication variables
+    # Set the authentication variables.
     set_globals(configs)
 
-    # Create results file to write to.
+    # Create error.log to write errors to.
     logging.basicConfig(filename="errors.log", filemode="w", level=logging.ERROR)
 
     # Verify that Manifest.yml has all libraries and their versions.
@@ -236,19 +236,19 @@ def main():
     # Verify status checks in all repos.
     validate_checks(repo_paths)
 
-    # Validate that the jenkins CI passed.
+    # Validate that the Jenkins CI passed.
     validate_ci()
 
-    # Check a repo that only qualified branches exist
+    # Check that only qualified branches exist in each library repo.
     validate_branches(repo_paths)
 
     # Verify there are no pending PRs to the release-candidate branch.
     validate_release_candidate_branch()
 
     if errors > 0:
-        print("Release verification failed please see errors.log")
+        print("Release verification failed, please see errors.log")
     else:
-        print("All release verification passed.")
+        print("Release verification passed.")
 
 
 if __name__ == "__main__":
