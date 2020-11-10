@@ -215,10 +215,20 @@ def set_globals(configs):
         access_token = configs["github_access_token"]
     if access_token == None:
         raise Exception("Please define GITHUB_ACCESS_TOKEN in your system's environment variables or in config.yml")
+    jenkins_username = os.environ.get("JENKINS_USERNAME")
+    if jenkins_username == None:
+        jenkins_username = configs["jenkins_username"]
+    if jenkins_username == None:
+        raise Exception("Please define JENKINS_USERNAME in your system's environment variables or in config.yml")
+    jenkins_password = os.environ.get("JENKINS_USERNAME")
+    if jenkins_password == None:
+        jenkins_password = configs["jenkins_password"]
+    if jenkins_password == None:
+        raise Exception("Please define JENKINS_PASSWORD in your system's environment variables or in config.yml")
     GITHUB_ACCESS_TOKEN = access_token
     GITHUB_AUTH_HEADER["Authorization"] = GITHUB_AUTH_HEADER["Authorization"].format(GITHUB_ACCESS_TOKEN)
-    JENKINS_USERNAME = configs["jenkins_username"]
-    JENKINS_PASSWORD = configs["jenkins_password"]
+    JENKINS_USERNAME = jenkins_username
+    JENKINS_PASSWORD = jenkins_password
     JENKINS_SERVER_VERIFY = False if configs["disable_jenkins_server_verify"] else True
 
 

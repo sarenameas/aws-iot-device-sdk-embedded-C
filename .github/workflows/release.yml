@@ -1,0 +1,57 @@
+name: CSDK Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_id:
+        description: 'Commit ID'
+        required: true
+      version_number:
+        description: 'Version Number (i.e. 202011.00)'
+        required: true
+        default: '202011.00'
+      core_http_version:
+        description: 'coreHTTP version number'
+        required: true
+        default: 'v1.0.0'
+      core_json_version:
+        description: 'coreJSON version number'
+        required: true
+        default: 'v2.0.0'
+      core_mqtt_version:
+        description: 'coreMQTT version number'
+        required: true
+        default: 'v1.0.1'
+      defender_version:
+        description: 'Device Defender version number'
+        required: true
+        default: 'v1.0.0'
+      shadow_version:
+        description: "Device Shadow version number"
+        required: true
+        default: 'v1.0.1'
+      jobs_version:
+        description: "Jobs version number"
+        required: true
+        default: 'v1.0.1'
+
+jobs:
+  release:
+    name: CSDK Release Creation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check release-candidate branch
+        uses: actions/checkout@v2
+        with:
+          ref: release-candidate
+          submodules: recursive
+
+      - name: Tools setup
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8.5
+          architecture:   x64
+        env:
+          GITHUB_ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+          JENKINS_USERNAME: ${{ secrets.JENKINS_USERNAME }}
+          JENKINS_PASSWORD: ${{ secrets.JENKINS_PASSWORD }}
