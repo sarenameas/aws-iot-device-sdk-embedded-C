@@ -14,28 +14,30 @@ CSDK_LIBRARY_DIRS = [os.path.join("libraries", "aws"), os.path.join("library", "
 CSDK_BRANCHES = ["master", "v4_beta_deprecated"]
 
 # CSDK organization and repo constants
-CSDK_ORG = "sarenameas"
+CSDK_ORG = "aws"
 CSDK_REPO = "aws-iot-device-sdk-embedded-c"
 
 # Github API global
 GITHUB_API_URL = "https://api.github.com"
 GITHUB_ACCESS_TOKEN = ""
-GITHUB_AUTH_HEADER = {"Authorization": "token %s" % GITHUB_ACCESS_TOKEN, "Accept": "application/vnd.github.v3+json"}
+GITHUB_AUTH_HEADER = {"Authorization": "token {}", "Accept": "application/vnd.github.v3+json"}
 
 # Jenkins API globals
-JENKINS_API_URL = "https://amazon-freertos-ci.corp.amazon.com/"
+JENKINS_API_URL = "https://amazon-freertos-ci.corp.amazon.com"
 JENKINS_USERNAME = ""
 JENKINS_PASSWORD = ""
 JENKINS_CSDK_DEMOS_PATH = "job/csdk/job/demo_pipeline/lastCompletedBuild"
 JENKINS_CSDK_TESTS_PATH = "job/csdk/job/nightly/lastCompletedBuild"
 JENKINS_API_PATH = "api/json"
+JENKINS_SERVER_VERIFY = True
 
 # Errors found in this run.
 errors = 0
 
+
 def log_error(error_log):
     global errors
-    log_error(error_log)
+    logging.error(error_log)
     errors = errors + 1
 
 
@@ -72,11 +74,13 @@ def validate_checks(repo_paths):
         repo_paths (dict): Paths to all library repos in the CSDK, including their org.
     """
     for repo_path in repo_paths:
-        git_req = requests.get(f"{GITHUB_API_URL}/{repo_path}/commits/master/check-runs", headers=GITHUB_AUTH_HEADER)
+        git_req = requests.get(
+            f"{GITHUB_API_URL}/repos/{repo_path}/commits/master/check-runs", headers=GITHUB_AUTH_HEADER
+        )
         # The first item is the latest commit on master.
         if git_req.json()["check_runs"][0]["conclusion"] != "success":
             log_error(f"The GHA status checks failed for {repo_path}.")
-        git_req = requests.get(f"{GITHUB_API_URL}/{repo_path}/commits/master/status", headers=GITHUB_AUTH_HEADER)
+        git_req = requests.get(f"{GITHUB_API_URL}/repos/{repo_path}/commits/master/status", headers=GITHUB_AUTH_HEADER)
         if git_req.json()["state"] != "success":
             log_error(f"The CBMC status checks failed for {repo_path}.")
 
@@ -88,12 +92,14 @@ def validate_ci():
     jenkins_req = requests.get(
         f"{JENKINS_API_URL}/{JENKINS_CSDK_DEMOS_PATH}/{JENKINS_API_PATH}",
         auth=HTTPBasicAuth(JENKINS_USERNAME, JENKINS_PASSWORD),
+        verify=JENKINS_SERVER_VERIFY,
     )
     if jenkins_req.json()["result"] != "SUCCESS":
         log_error(f"Jenkins job failed: {JENKINS_API_URL}/{JENKINS_CSDK_DEMOS_PATH}.")
     jenkins_req = requests.get(
         f"{JENKINS_API_URL}/{JENKINS_CSDK_TESTS_PATH}/{JENKINS_API_PATH}",
         auth=HTTPBasicAuth(JENKINS_USERNAME, JENKINS_PASSWORD),
+        verify=JENKINS_SERVER_VERIFY,
     )
     if jenkins_req.json()["result"] != "SUCCESS":
         log_error(f"Jenkins job failed: {JENKINS_API_URL}/{JENKINS_CSDK_TESTS_PATH}.")
@@ -106,26 +112,47 @@ def validate_branches(repo_paths):
         repo_paths (dict): Paths to all library repos in the CSDK, including their org.
     """
     for repo_path in repo_paths:
-        git_req = requests.get(f"{GITHUB_API_URL}/{repo_path}/branches/", headers=GITHUB_AUTH_HEADER)
+        git_req = requests.get(f"{GITHUB_API_URL}/repos/{repo_path}/branches", headers=GITHUB_AUTH_HEADER)
         valid_branches = ["master"]
-        if repo_path == "{CSDK_ORG}/{CSDK_REPO}":
-            valid_branches.append("v4_beta_deprecated")
+        if repo_path == f"{CSDK_ORG}/{CSDK_REPO}":
+            valid_branches += ["v4_beta_deprecated", "release-candidate"]
         for branch in git_req.json():
             branch_name = branch["name"]
             if branch_name not in valid_branches:
                 log_error(f"Invalid branch {branch_name} found in {repo_path}.")
 
 
-def validate_release_candidate_branches():
+def validate_release_candidate_branch():
     """
     Verifies there are no pending PRs to the release candidate branch.
     """
     git_req = requests.get(
-        f"{GITHUB_API_URL}/{CSDK_ORG}/{CSDK_REPO}/pulls?base=release-candidate", headers=GITHUB_AUTH_HEADER
+        f"{GITHUB_API_URL}/repos/{CSDK_ORG}/{CSDK_REPO}/pulls?base=release-candidate", headers=GITHUB_AUTH_HEADER
     )
+    if len(git_req.json()) == 0:
+        logging.warn("release-candidate branch does not exist in CSDK.")
     for pr in git_req.json():
         pr_url = pr["url"]
         log_error(f"Pull request to release-candidate {pr_url}.")
+
+
+def set_globals(configs):
+    global GITHUB_ACCESS_TOKEN
+    global GITHUB_AUTH_HEADER
+    global JENKINS_USERNAME
+    global JENKINS_PASSWORD
+    global JENKINS_SERVER_VERIFY
+
+    access_token = os.environ.get("GITHUB_ACCESS_TOKEN")
+    if access_token == None:
+        access_token = configs["github_access_token"]
+    if access_token == None:
+        raise Exception("Please define GITHUB_ACCESS_TOKEN in your system's environment variables or in config.yml")
+    GITHUB_ACCESS_TOKEN = access_token
+    GITHUB_AUTH_HEADER["Authorization"] = GITHUB_AUTH_HEADER["Authorization"].format(GITHUB_ACCESS_TOKEN)
+    JENKINS_USERNAME = configs["jenkins_username"]
+    JENKINS_PASSWORD = configs["jenkins_password"]
+    JENKINS_SERVER_VERIFY = False if configs["disable_jenkins_server_verify"] else True
 
 
 def main():
@@ -135,33 +162,36 @@ def main():
     # Parse the input arguments to this script.
     parser = argparse.ArgumentParser(description="Perform CSDK Release activities.")
     parser.add_argument("-r", "--root", action="store", required=True, dest="root", help="CSDK repo root path.")
+    parser.add_argument(
+        "--disable-jenkins-server-verify",
+        action="store_true",
+        required=False,
+        default=False,
+        dest="disable_jenkins_server_verify",
+        help="Disable server verification for the Jenkins API calls if your system doesn't have the certificate in its store.",
+    )
     args = parser.parse_args()
     csdk_root = os.path.abspath(args.root)
 
     # Parse the input config.yml
     with open(os.path.join(csdk_root, "tools", "release", "config.yml")) as config_file:
         configs = yaml.load(config_file, Loader=yaml.FullLoader)
+    configs["disable_jenkins_server_verify"] = args.disable_jenkins_server_verify
 
     # Parse the manifest.yml
     with open(os.path.join(csdk_root, "manifest.yml")) as manifest_file:
         manifest = yaml.load(manifest_file, Loader=yaml.FullLoader)
     repo_paths = []
     for dep in manifest["dependencies"]:
-        repo_paths.append(dep["url"][dep["url"].find(".com/") + len(".com/")])
-    repo_paths.append("{CSDK_ORG}/{CSDK_REPO}")
+        dep_url = dep["repository"]["url"]
+        repo_paths.append(dep_url[dep_url.find(".com/") + len(".com/") :])
+    repo_paths.append(f"{CSDK_ORG}/{CSDK_REPO}")
 
     # Get the authentication variables
-    access_token = os.environ.get("GITHUB_ACCESS_TOKEN")
-    if access_token == None:
-        access_token = configs["github_access_token"]
-    if access_token == None:
-        raise Exception("Please define GITHUB_ACCESS_TOKEN in your system's environment variables or in config.yml")
-    GITHUB_ACCESS_TOKEN = access_token
-    JENKINS_USERNAME = configs["jenkins_username"]
-    JENKINS_PASSWORD = configs["jenkins_password"]
+    set_globals(configs)
 
     # Create results file to write to.
-    logging.basicConfig(filename="errors.log", filempde="w", level=logging.ERROR)
+    logging.basicConfig(filename="errors.log", filemode="w", level=logging.ERROR)
 
     # Verify that Manifest.yml has all libraries and their versions.
     validate_manifest(manifest, configs["csdk_version"], configs["versions"])
@@ -176,10 +206,10 @@ def main():
     validate_branches(repo_paths)
 
     # Verify there are no pending PRs to the release-candidate branch.
-    validate_release_candidate_branches()
+    validate_release_candidate_branch()
 
     if errors > 0:
-        print("Release verification failed please see results.log")
+        print("Release verification failed please see errors.log")
     else:
         print("All release verification passed.")
 
