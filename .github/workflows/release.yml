@@ -61,7 +61,7 @@ jobs:
         run: |
           python tools/release/release-verify.py \
           --root . \
-          --csdk-version ${{github.event.inputs.csdk_version}} \
+          --csdk-version ${{github.event.inputs.version_number}} \
           --corehttp-version ${{github.event.inputs.corehttp_version}} \
           --coremqtt-version ${{github.event.inputs.coremqtt_version}} \
           --corejson-version ${{github.event.inputs.corejson_version}} \
