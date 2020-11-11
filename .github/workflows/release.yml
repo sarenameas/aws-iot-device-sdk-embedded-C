@@ -1,4 +1,4 @@
-name: CSDK Release
+name: CSDK-Release
 
 on:
   workflow_dispatch:
@@ -53,8 +53,10 @@ jobs:
           JENKINS_USERNAME: ${{secrets.JENKINS_USERNAME}}
           JENKINS_PASSWORD: ${{secrets.JENKINS_PASSWORD}}
           JENKINS_API_URL: ${{secrets.JENKINS_API_URL}}
+
       - name: Install Python packages required
         run: pip install -r tools/release/requirements.txt
+
       - name: Verify release-candidate branch
         run: |
           python tools/release/release-verify.py \
