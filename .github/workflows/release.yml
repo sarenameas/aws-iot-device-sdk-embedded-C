@@ -53,6 +53,7 @@ jobs:
           JENKINS_USERNAME: ${{secrets.JENKINS_USERNAME}}
           JENKINS_PASSWORD: ${{secrets.JENKINS_PASSWORD}}
           JENKINS_API_URL: ${{secrets.JENKINS_API_URL}}
+        run: pip install -r tools/release/requirements.txt
 
       - name: Verify release-candidate branch
         run: |
