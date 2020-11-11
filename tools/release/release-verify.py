@@ -12,7 +12,7 @@ import re
 CSDK_LIBRARY_DIRS = ["libraries/aws", "libraries/standard"]
 
 # CSDK organization and repo constants
-CSDK_ORG = "aws"
+CSDK_ORG = "sarenameas"
 CSDK_REPO = "aws-iot-device-sdk-embedded-c"
 
 # Github API global. The Github API is used instead of pyGithub because some
@@ -86,19 +86,19 @@ def validate_checks() -> list:
     repo_paths = []
     for library_dir in CSDK_LIBRARY_DIRS:
         # Get the submodules in the library directory.
-        git_req = requests.get(
+        git_resp = requests.get(
             f"{GITHUB_API_URL}/repos/{CSDK_ORG}/{CSDK_REPO}/contents/{library_dir}?ref=release-candidate",
             headers=GITHUB_AUTH_HEADER,
         )
         # A 404 status code means the branch doesn't exist.
-        if git_req.status_code == 404:
+        if git_resp.status_code == 404:
             log_error(
                 "The release-candidate branch does not exist in the CSDK. Please create the release-candidate branch."
             )
             break
         else:
             # For each library submodule in this directory, get the status checks results and docs to review.
-            for library in git_req.json():
+            for library in git_resp.json():
                 library_name = library["name"]
                 # Get the commit SHA of the branch currently in release-candidate.
                 commit_sha = library["sha"]
@@ -107,16 +107,16 @@ def validate_checks() -> list:
                 repo_path = re.search("(?<=\.com/)(.*)(?=/tree)", html_url).group(0)
                 repo_paths.append(repo_path)
                 # Get the status of the CBMC checks
-                git_req = requests.get(
+                git_resp = requests.get(
                     f"{GITHUB_API_URL}/repos/{repo_path}/commits/{commit_sha}/status", headers=GITHUB_AUTH_HEADER
                 )
-                if git_req.json()["state"] != "success":
+                if git_resp.json()["state"] != "success":
                     log_error(f"The CBMC status checks failed for {html_url}.")
                 # Get the status of the GHA checks
-                git_req = requests.get(
+                git_resp = requests.get(
                     f"{GITHUB_API_URL}/repos/{repo_path}/commits/{commit_sha}/check-runs", headers=GITHUB_AUTH_HEADER
                 )
-                for check_run in git_req.json()["check_runs"]:
+                for check_run in git_resp.json()["check_runs"]:
                     if check_run["conclusion"] != "success":
                         check_run_name = check_run["name"]
                         log_error(f"The GHA {check_run_name} check failed for {html_url}.")
@@ -126,6 +126,7 @@ def validate_checks() -> list:
                 docs_file.write(f"{library_name}\n")
                 docs_file.write(f"{html_url}/README.md\n")
                 docs_file.write(f"{html_url}/CHANGELOG.md\n\n")
+
     docs_file.close()
     repo_paths.append(f"{CSDK_ORG}/{CSDK_REPO}")
     return repo_paths
@@ -135,19 +136,19 @@ def validate_ci():
     """
     Validates that all CSDK jobs in the Jenkins CI passed.
     """
-    jenkins_req = requests.get(
+    jenkins_resp = requests.get(
         f"{JENKINS_API_URL}/{JENKINS_CSDK_DEMOS_PATH}/{JENKINS_API_PATH}",
         auth=HTTPBasicAuth(JENKINS_USERNAME, JENKINS_PASSWORD),
         verify=JENKINS_SERVER_VERIFY,
     )
-    if jenkins_req.json()["result"] != "SUCCESS":
+    if jenkins_resp.json()["result"] != "SUCCESS":
         log_error(f"Jenkins job failed: {JENKINS_API_URL}/{JENKINS_CSDK_DEMOS_PATH}.")
-    jenkins_req = requests.get(
+    jenkins_resp = requests.get(
         f"{JENKINS_API_URL}/{JENKINS_CSDK_TESTS_PATH}/{JENKINS_API_PATH}",
         auth=HTTPBasicAuth(JENKINS_USERNAME, JENKINS_PASSWORD),
         verify=JENKINS_SERVER_VERIFY,
     )
-    if jenkins_req.json()["result"] != "SUCCESS":
+    if jenkins_resp.json()["result"] != "SUCCESS":
         log_error(f"Jenkins job failed: {JENKINS_API_URL}/{JENKINS_CSDK_TESTS_PATH}.")
 
 
@@ -158,11 +159,11 @@ def validate_branches(repo_paths):
         repo_paths (dict): Paths to all library repos in the CSDK, including their org.
     """
     for repo_path in repo_paths:
-        git_req = requests.get(f"{GITHUB_API_URL}/repos/{repo_path}/branches", headers=GITHUB_AUTH_HEADER)
+        git_resp = requests.get(f"{GITHUB_API_URL}/repos/{repo_path}/branches", headers=GITHUB_AUTH_HEADER)
         valid_branches = ["master"]
         if repo_path == f"{CSDK_ORG}/{CSDK_REPO}":
             valid_branches += ["v4_beta_deprecated", "release-candidate"]
-        for branch in git_req.json():
+        for branch in git_resp.json():
             branch_name = branch["name"]
             if branch_name not in valid_branches:
                 log_error(f"Invalid branch {branch_name} found in {repo_path}.")
@@ -172,12 +173,12 @@ def validate_release_candidate_branch():
     """
     Verifies there are no pending PRs to the release candidate branch.
     """
-    git_req = requests.get(
+    git_resp = requests.get(
         f"{GITHUB_API_URL}/repos/{CSDK_ORG}/{CSDK_REPO}/pulls?base=release-candidate", headers=GITHUB_AUTH_HEADER
     )
-    if len(git_req.json()) == 0:
+    if len(git_resp.json()) == 0:
         logging.warn("release-candidate branch does not exist in CSDK.")
-    for pr in git_req.json():
+    for pr in git_resp.json():
         pr_url = pr["url"]
         log_error(f"Pull request to release-candidate {pr_url}.")
 
