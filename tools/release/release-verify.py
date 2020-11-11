@@ -22,7 +22,7 @@ GITHUB_ACCESS_TOKEN = ""
 GITHUB_AUTH_HEADER = {"Authorization": "token {}", "Accept": "application/vnd.github.v3+json"}
 
 # Jenkins API globals
-JENKINS_API_URL = "https://amazon-freertos-ci.corp.amazon.com"
+JENKINS_API_URL = ""
 JENKINS_USERNAME = ""
 JENKINS_PASSWORD = ""
 JENKINS_CSDK_DEMOS_PATH = "job/csdk/job/demo_pipeline/lastCompletedBuild"
@@ -35,44 +35,55 @@ errors = 0
 
 
 def log_error(error_log):
+    """
+    Logs an error to error.log.
+    Args:
+        error_log (str): Error string to log.
+    """
     global errors
     logging.error(error_log)
     errors = errors + 1
 
 
-def validate_manifest(manifest, csdk_version, lib_versions) -> list:
+def validate_manifest(csdk_root, csdk_version, lib_versions):
     """
     Validates the manifest.yml file at the root of the CSDK.
     Args:
-        manifest (dict): The CSDK's manifest.yml loaded into a dictionary.
+        csdk_root (str): The root path to the CSDK repo.
         csdk_versions (str): The new version of the CSDK repo.
         lib_versions (dict): A dictionary containing the new versions of each library.
         Please see tools/release/config.yml.
-    Returns the list of errors.
     """
+    with open(os.path.join(csdk_root, "manifest.yml")) as manifest_file:
+        manifest = yaml.load(manifest_file, Loader=yaml.FullLoader)
+
+    # Verify the CSDK version is correct.
     manifest_version = manifest["version"]
     if manifest_version != csdk_version:
         log_error(f"Invalid manifest.yml. CSDK version {manifest_version} should be {csdk_version}.")
 
-    for library in lib_versions.keys():
-        found = filter(lambda dep: dep["name"].casefold() == library, manifest["dependencies"])
-        found = list(found)
-        if len(found) != 1:
-            log_error(f"Invalid manifest.yml. Found {len(found)} occurrences of required library {library}.")
-        else:
-            dep_version = found[0]["version"]
-            dep_name = found[0]["name"]
-            if dep_version != lib_versions[library]:
-                log_error(f"Invalid manifest.yml. Invalid version {dep_version} for {dep_name}")
+    # Verify that all libraries in this branch are also in the manifest.yml.
+    for library_dir in CSDK_LIBRARY_DIRS:
+        libraries = os.listdir(os.path.join(csdk_root, library_dir))
+        for library in libraries:
+            found = filter(lambda dep: dep["name"].casefold() == library.casefold(), manifest["dependencies"])
+            found = list(found)
+            if len(found) != 1:
+                log_error(f"Invalid manifest.yml. Found {len(found)} occurrences of required library {library}.")
+            else:
+                dep_version = found[0]["version"]
+                dep_name = found[0]["name"]
+                if dep_version != lib_versions[library]:
+                    log_error(f"Invalid manifest.yml. Invalid version {dep_version} for {dep_name}")
 
 
-def validate_checks(repo_paths):
+def validate_checks() -> list:
     """
     Validates that all of the GHA and CBMC status checks passed on all repos.
-    Args:
-        repo_paths (dict): Paths to all library repos in the CSDK, including their org.
+    Returns a list of existing org/repo paths found.
     """
     docs_file = open("docs_to_review.txt", "w+")
+    repo_paths = []
     for library_dir in CSDK_LIBRARY_DIRS:
         # Get the submodules in the library directory.
         git_req = requests.get(
@@ -94,7 +105,7 @@ def validate_checks(repo_paths):
                 # Get the organization of this repo
                 html_url = library["html_url"]
                 repo_path = re.search("(?<=\.com/)(.*)(?=/tree)", html_url).group(0)
-
+                repo_paths.append(repo_path)
                 # Get the status of the CBMC checks
                 git_req = requests.get(
                     f"{GITHUB_API_URL}/repos/{repo_path}/commits/{commit_sha}/status", headers=GITHUB_AUTH_HEADER
@@ -116,6 +127,8 @@ def validate_checks(repo_paths):
                 docs_file.write(f"{html_url}/README.md\n")
                 docs_file.write(f"{html_url}/CHANGELOG.md\n\n")
     docs_file.close()
+    repo_paths.append(f"{CSDK_ORG}/{CSDK_REPO}")
+    return repo_paths
 
 
 def validate_ci():
@@ -169,43 +182,15 @@ def validate_release_candidate_branch():
         log_error(f"Pull request to release-candidate {pr_url}.")
 
 
-def get_configs(args) -> (dict, str):
-    """
-    Retrieve configs.yml into a dictionary and get the csdk_root from the the
-    input user args.
-    Args:
-        args(Namespace) User argument namespace.
-    """
-    csdk_root = os.path.abspath(args.root)
-    with open(os.path.join(csdk_root, "tools", "release", "config.yml")) as config_file:
-        configs = yaml.load(config_file, Loader=yaml.FullLoader)
-    configs["disable_jenkins_server_verify"] = args.disable_jenkins_server_verify
-    return (configs, csdk_root)
-
-
-def get_manifest(csdk_root) -> (dict, list):
-    """
-    Retrieve manifest.yml into a dictionary. From the manifest.yml we also get
-    the org/repo of each library.
-    Args:
-        csdk_root(str): The absolute path 
-    """
-    with open(os.path.join(csdk_root, "manifest.yml")) as manifest_file:
-        manifest = yaml.load(manifest_file, Loader=yaml.FullLoader)
-    repo_paths = []
-    for dep in manifest["dependencies"]:
-        dep_url = dep["repository"]["url"]
-        repo_paths.append(re.search("(?<=\.com/)(.*)", dep_url).group(0))
-    repo_paths.append(f"{CSDK_ORG}/{CSDK_REPO}")
-    return (manifest, repo_paths)
-
-
 def set_globals(configs):
     """
     Set global variables used in this script.
+    Args:
+        configs (dict): User configurations for this script.
     """
     global GITHUB_ACCESS_TOKEN
     global GITHUB_AUTH_HEADER
+    global JENKINS_API_URL
     global JENKINS_USERNAME
     global JENKINS_PASSWORD
     global JENKINS_SERVER_VERIFY
@@ -214,31 +199,64 @@ def set_globals(configs):
     if access_token == None:
         access_token = configs["github_access_token"]
     if access_token == None:
-        raise Exception("Please define GITHUB_ACCESS_TOKEN in your system's environment variables or in config.yml")
+        raise Exception(
+            "Please define GITHUB_ACCESS_TOKEN in your system's environment variables or pass argument --github-access-token to this script."
+        )
     jenkins_username = os.environ.get("JENKINS_USERNAME")
     if jenkins_username == None:
         jenkins_username = configs["jenkins_username"]
     if jenkins_username == None:
-        raise Exception("Please define JENKINS_USERNAME in your system's environment variables or in config.yml")
-    jenkins_password = os.environ.get("JENKINS_USERNAME")
+        raise Exception(
+            "Please define JENKINS_USERNAME in your system's environment variables or pass argument --jenkins-username to this script."
+        )
+    jenkins_password = os.environ.get("JENKINS_PASSWORD")
     if jenkins_password == None:
         jenkins_password = configs["jenkins_password"]
     if jenkins_password == None:
-        raise Exception("Please define JENKINS_PASSWORD in your system's environment variables or in config.yml")
+        raise Exception(
+            "Please define JENKINS_PASSWORD in your system's environment variables or pass argument --jenkins-password to this script."
+        )
+    jenkins_api_url = os.environ.get("JENKINS_API_URL")
+    if jenkins_api_url == None:
+        jenkins_password = configs["jenkins_api_url"]
+    if jenkins_password == None:
+        raise Exception(
+            "Please define JENKINS_API_URL in your system's environment variables or pass argument --jenkins_api_url to this script."
+        )
     GITHUB_ACCESS_TOKEN = access_token
     GITHUB_AUTH_HEADER["Authorization"] = GITHUB_AUTH_HEADER["Authorization"].format(GITHUB_ACCESS_TOKEN)
     JENKINS_USERNAME = jenkins_username
     JENKINS_PASSWORD = jenkins_password
+    JENKINS_API_URL = jenkins_api_url
     JENKINS_SERVER_VERIFY = False if configs["disable_jenkins_server_verify"] else True
 
 
-def parse_arguments() -> argparse.Namespace:
+def get_configs() -> dict:
     """
-    Parse the input user arguments and return a Namespace.
+    Parse the input user arguments and return a dictionary of arguments.
     """
     # Parse the input arguments to this script.
     parser = argparse.ArgumentParser(description="Perform CSDK Release activities.")
     parser.add_argument("-r", "--root", action="store", required=True, dest="root", help="CSDK repo root path.")
+    parser.add_argument(
+        "--github-access-token",
+        action="store",
+        required=False,
+        dest="github_access_token",
+        help="Github API developer access token.",
+    )
+    parser.add_argument(
+        "--jenkins-api-url", action="store", required=False, dest="jenkins_api_url", help="Jenkins CI API url."
+    )
+    parser.add_argument(
+        "--jenkins-username", action="store", required=False, dest="jenkins_username", help="Jenkins CI username."
+    )
+    parser.add_argument(
+        "--jenkins-password", action="store", required=False, dest="jenkins_password", help="Jenkins CI password."
+    )
+    parser.add_argument(
+        "--csdk-version", action="store", required=True, dest="csdk_version", help="CSDK version to be released."
+    )
     parser.add_argument(
         "--disable-jenkins-server-verify",
         action="store_true",
@@ -247,21 +265,33 @@ def parse_arguments() -> argparse.Namespace:
         dest="disable_jenkins_server_verify",
         help="Disable server verification for the Jenkins API calls if your system doesn't have the certificate in its store.",
     )
-    return parser.parse_args()
+
+    args, unknown = parser.parse_known_args()
+    csdk_root = os.path.abspath(args.root)
+
+    # For each of the available libraries in the current branch require a version argument.
+    for library_dir in CSDK_LIBRARY_DIRS:
+        libraries = os.listdir(os.path.join(csdk_root, library_dir))
+        for library in libraries:
+            parser.add_argument(
+                f"--{library}-version",
+                action="store",
+                required=True,
+                dest=f"{library}",
+                type=str.lower,
+                help=f"{library} library version.",
+            )
+    args = parser.parse_args()
+    configs = vars(args)
+    return (configs, csdk_root)
 
 
 def main():
     """
     Performs pre-release validation of the CSDK and the library spoke repos.
     """
-
-    args = parse_arguments()
-
-    # Parse the input config.yml and args for the CSDK root.
-    (configs, csdk_root) = get_configs(args)
-
-    # Parse the manifest.yml for org/repo paths.
-    (manifest, repo_paths) = get_manifest(csdk_root)
+    # Parse the input arguments and args for configurations and the  CSDK root.
+    (configs, csdk_root) = get_configs()
 
     # Set the authentication variables.
     set_globals(configs)
@@ -270,10 +300,10 @@ def main():
     logging.basicConfig(filename="errors.log", filemode="w", level=logging.ERROR)
 
     # Verify that Manifest.yml has all libraries and their versions.
-    validate_manifest(manifest, configs["csdk_version"], configs["versions"])
+    validate_manifest(csdk_root, configs["csdk_version"], configs)
 
     # Verify status checks in all repos.
-    validate_checks(repo_paths)
+    repo_paths = validate_checks()
 
     # Validate that the Jenkins CI passed.
     validate_ci()
