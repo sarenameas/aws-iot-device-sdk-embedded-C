@@ -59,10 +59,10 @@ jobs:
         run: |
           python tools/release/release-verify.py \
           --root . \
-          --csdk-version ${{github.event.inputs.csdk_version}}
-          --corehttp-version ${{github.event.inputs.corehttp_version}}
-          --coremqtt-version ${{github.event.inputs.coremqtt_version}}
-          --corejson-version ${{github.event.inputs.corejson_version}}
-          --device-defender-for-aws-iot-embedded-sdk-version ${{github.event.inputs.defender_version}}
-          --device-shadow-for-aws-iot-embedded-sdk-version ${{github.event.inputs.shadow_version}}
+          --csdk-version ${{github.event.inputs.csdk_version}} \
+          --corehttp-version ${{github.event.inputs.corehttp_version}} \
+          --coremqtt-version ${{github.event.inputs.coremqtt_version}} \
+          --corejson-version ${{github.event.inputs.corejson_version}} \
+          --device-defender-for-aws-iot-embedded-sdk-version ${{github.event.inputs.defender_version}} \
+          --device-shadow-for-aws-iot-embedded-sdk-version ${{github.event.inputs.shadow_version}} \
           --jobs-for-aws-iot-embedded-sdk-version ${{github.event.inputs.jobs_version}}
