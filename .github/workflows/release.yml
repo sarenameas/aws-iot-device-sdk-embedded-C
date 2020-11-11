@@ -68,3 +68,4 @@ jobs:
           --device-defender-for-aws-iot-embedded-sdk-version ${{github.event.inputs.defender_version}} \
           --device-shadow-for-aws-iot-embedded-sdk-version ${{github.event.inputs.shadow_version}} \
           --jobs-for-aws-iot-embedded-sdk-version ${{github.event.inputs.jobs_version}}
+          cat error.log

@@ -66,7 +66,8 @@ def validate_manifest(csdk_root, csdk_version, lib_versions):
     for library_dir in CSDK_LIBRARY_DIRS:
         libraries = os.listdir(os.path.join(csdk_root, library_dir))
         for library in libraries:
-            found = filter(lambda dep: dep["name"].casefold() == library.casefold(), manifest["dependencies"])
+            library = library.lower()
+            found = filter(lambda dep: dep["name"].casefold() == library, manifest["dependencies"])
             found = list(found)
             if len(found) != 1:
                 log_error(f"Invalid manifest.yml. Found {len(found)} occurrences of required library {library}.")
@@ -275,10 +276,10 @@ def get_configs() -> dict:
         libraries = os.listdir(os.path.join(csdk_root, library_dir))
         for library in libraries:
             parser.add_argument(
-                f"--{library}-version",
+                f"--{library.casefold()}-version",
                 action="store",
                 required=True,
-                dest=f"{library}",
+                dest=f"{library.casefold()}",
                 type=str.lower,
                 help=f"{library} library version.",
             )
