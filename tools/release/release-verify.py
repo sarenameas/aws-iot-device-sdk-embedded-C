@@ -12,11 +12,11 @@ import re
 CSDK_LIBRARY_DIRS = ["libraries/aws", "libraries/standard"]
 
 # CSDK organization and repo constants
-CSDK_ORG = "sarenameas"
+CSDK_ORG = "aws"
 CSDK_REPO = "aws-iot-device-sdk-embedded-c"
 
 # Github API global. The Github API is used instead of pyGithub because some
-# checks are not available yet in the packet.
+# checks are not available yet in the package.
 GITHUB_API_URL = "https://api.github.com"
 GITHUB_ACCESS_TOKEN = ""
 GITHUB_AUTH_HEADER = {"Authorization": "token {}", "Accept": "application/vnd.github.v3+json"}
@@ -123,7 +123,7 @@ def validate_checks() -> list:
                         log_error(f"The GHA {check_run_name} check failed for {html_url}.")
 
                 # Collect the HTML URLS for reviewing the docs.
-                html_url = html_url.split(commit_sha)[0] + "master"
+                html_url = html_url.split(commit_sha)[0] + "main"
                 docs_file.write(f"{library_name}\n")
                 docs_file.write(f"{html_url}/README.md\n")
                 docs_file.write(f"{html_url}/CHANGELOG.md\n\n")
@@ -155,13 +155,13 @@ def validate_ci():
 
 def validate_branches(repo_paths):
     """
-    Validates that only the master branch exists on each library repo.
+    Validates that only the main branch exists on each library repo.
     Args:
         repo_paths (dict): Paths to all library repos in the CSDK, including their org.
     """
     for repo_path in repo_paths:
         git_resp = requests.get(f"{GITHUB_API_URL}/repos/{repo_path}/branches", headers=GITHUB_AUTH_HEADER)
-        valid_branches = ["master"]
+        valid_branches = ["main"]
         if repo_path == f"{CSDK_ORG}/{CSDK_REPO}":
             valid_branches += ["v4_beta_deprecated", "release-candidate"]
         for branch in git_resp.json():

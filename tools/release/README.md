@@ -1,10 +1,11 @@
-# Release automation for AWS IoT Embedded C SDK
+# Pre-release verification for AWS IoT Embedded C SDK
 
 ## Prerequisites
 
 - Linux environment
 - [Git](https://git-scm.com/downloads/)
 - [Python 3](https://www.python.org/downloads/)
+- See [requirements.txt](requirements.txt) for the versions of Python packages needed.
 
 This script accompanies the CSDK release CM. You must use it in conjunction with a Preflight step.
 
@@ -12,10 +13,10 @@ This script accompanies the CSDK release CM. You must use it in conjunction with
 This script checks that:
     - All unit tests and code quality checks pass in each library repo committed on the release-candidate branch.
     - All jobs pass https://amazon-freertos-ci.corp.amazon.com/view/CSDK%20Jobs/job/csdk/
-    - Only the master branch exists in library repos.
-    - Only the master branch and v4_beta_deprecated exist in the CSDK.
+    - Only the main branch exists in library repos.
+    - Only the main branch and v4_beta_deprecated exist in the CSDK.
     - manifest.yml has all libraries and versions expected in this script's config.yml
-    - 
+    - There are no pending PRs on the release-candidate branch.
 
 This script outputs:
     - **error.log** in the working directory for any errors found in verification.
@@ -27,31 +28,41 @@ This script outputs:
 ```console
 git clone git@github.com:aws/aws-iot-device-sdk-embedded-C.git --recurse-submodules
 ```
-1. Enter your [Github API Access Token](https://docs.github.com/en/free-pro-team@latest/github/authenticating-to-github/creating-a-personal-access-token) in [config.yml](config.yml).
-```yml
-github_access_token: abcdefghijklmnopqrztuvwxyz12345678910111
-```
-
-1. Enter your username and password to the Jenkins CI into [config.yml](config.yml).
-```yml
-jenkins_username: <AMAZON_LOGIN>
-jenkins_password: <JEKINS_PASSWORD>
-```
-
-1. Enter the versions for the next release into [config.yml](config.yml).
-```yml
-csdk_version: "202012.00"
-versions:
-  coremqtt: "v1.0.1"
-  corejson: "v2.0.0"
-  device-shadow-for-aws-iot-embedded-sdk: "v1.0.1"
-  corehttp: "v1.0.0"
-  device-defender-for-aws-iot-embedded-sdk: "v1.0.0"
-  jobs-for-aws-iot-embedded-sdk: "v1.0.0"
-```
-
-1. Run this script with the root of the CSDK repo.
+1. Create the **release-candidate** branch, if it doesn't already exist.
 ```console
-python3 release-verify.py --root <CSDK_ROOT>
+cd aws-iot-device-sdk-embedded-C
+git checkout -b release-candidate
+git push origin release-candidate
+```
+
+1. You will need your [Github API Access Token](https://docs.github.com/en/free-pro-team@latest/github/authenticating-to-github/creating-a-personal-access-token) and Jenkins CI URL, Username and Password. These should be saved into your system's environment variables as GITHUB_ACCESS_TOKEN, JENKINS_USERNAME, JENKINS_PASSWORD, JENKINS_API_URL.
+```console
+export GITHUB_ACCESS_TOKEN="my-secret-github-access-token"
+export JENKINS_API_URL="aws-team-jenkins-url"
+export JENKINS_USERNAME="my-jenkins-ci-username"
+export JENKINS_PASSWORD="my-jenkins-ci-password"
+```
+You can also enter these as parameters to the script.
+```
+--github-access-token "my-secret-github-access-token"
+--jenkins-api-url "aws-team-jenkins-url"
+--jenkins-user "my-jenkins-ci-username"
+--jenkins-password "my-jenkins-ci-password"
+```
+
+1. Run the script with the versions of every library repo that exists under [libraries/aws](../../libraries/aws) and [libaries/standard](../../libraries/standard) directories.
+```console
+python3 tools/release/release-verify.py \
+--root aws-iot-device-sdk-embedded-c \
+--csdk-version <CSDK_VERSION> \
+--coremqtt-version <MQTT_VERSION> \
+--corehttp-version <HTTP_VERSION>  \
+--corejson-version <JSON_VERSION>  \
+--device-defender-for-aws-iot-embedded-sdk-version <DEFENDER_VERSION> \
+--device-shadow-for-aws-iot-embedded-sdk-version <SHADOW_VERSION> \
+--jobs-for-aws-iot-embedded-sdk-version <JOBS_VERSION> \
+--corepkcs11-version <PKCS11_VERSION> \
+--retry-utils-version <RETRY_UTILS_VERSION> \
+--disable-jenkins-server-verify
 ```
 
