@@ -48,24 +48,24 @@ jobs:
         with:
           python-version: 3.8.5
           architecture:   x64
-        env:
-          GITHUB_ACCESS_TOKEN: ${{secrets.ACCESS_TOKEN}}
-          JENKINS_USERNAME: ${{secrets.JENKINS_USERNAME}}
-          JENKINS_PASSWORD: ${{secrets.JENKINS_PASSWORD}}
-          JENKINS_API_URL: ${{secrets.JENKINS_API_URL}}
 
       - name: Install Python packages required
         run: pip install -r tools/release/requirements.txt
 
       - name: Verify release-candidate branch
+        env:
+            JENKINS_USERNAME: ${{ secrets.JENKINS_USERNAME }}
+            JENKINS_PASSWORD: ${{ secrets.JENKINS_PASSWORD }}
+            JENKINS_API_URL: ${{ secrets.JENKINS_API_URL }}
         run: |
           python tools/release/release-verify.py \
           --root . \
           --csdk-version ${{github.event.inputs.version_number}} \
-          --corehttp-version ${{github.event.inputs.corehttp_version}} \
-          --coremqtt-version ${{github.event.inputs.coremqtt_version}} \
-          --corejson-version ${{github.event.inputs.corejson_version}} \
-          --device-defender-for-aws-iot-embedded-sdk-version ${{github.event.inputs.defender_version}} \
-          --device-shadow-for-aws-iot-embedded-sdk-version ${{github.event.inputs.shadow_version}} \
-          --jobs-for-aws-iot-embedded-sdk-version ${{github.event.inputs.jobs_version}}
+          --corehttp-version ${{ github.event.inputs.corehttp_version }} \
+          --coremqtt-version ${{ github.event.inputs.coremqtt_version }} \
+          --corejson-version ${{ github.event.inputs.corejson_version }} \
+          --device-defender-for-aws-iot-embedded-sdk-version ${{ github.event.inputs.defender_version }} \
+          --device-shadow-for-aws-iot-embedded-sdk-version ${{ github.event.inputs.shadow_version }} \
+          --jobs-for-aws-iot-embedded-sdk-version ${{ github.event.inputs.jobs_version }} \
+          --github-access-token ${{ secrets.ACCESS_TOKEN }}
           cat error.log
