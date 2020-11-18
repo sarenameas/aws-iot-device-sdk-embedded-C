@@ -12,7 +12,7 @@ This script accompanies the CSDK release CM. You must use it in conjunction with
 ## Output
 This script checks that:
     - All unit tests and code quality checks pass in each library repo committed on the release-candidate branch.
-    - All jobs pass https://amazon-freertos-ci.corp.amazon.com/view/CSDK%20Jobs/job/csdk/
+    - All jobs pass in <JENKINS_CI_URL>/view/CSDK%20Jobs/job/csdk/
     - Only the main branch exists in library repos.
     - Only the main branch and v4_beta_deprecated exist in the CSDK.
     - manifest.yml has all libraries and versions expected in this script's config.yml
@@ -20,7 +20,7 @@ This script checks that:
 
 This script outputs:
     - **error.log** in the working directory for any errors found in verification.
-    - **docs_to_review.txt** for all CHANGELOG.md and README.md files to review.
+    - **docs_to_review.txt** for all CHANGELOG.md and README.md files that need manual review.
 
 ## Usage
 
@@ -28,6 +28,7 @@ This script outputs:
 ```console
 git clone git@github.com:aws/aws-iot-device-sdk-embedded-C.git --recurse-submodules
 ```
+
 1. Create the **release-candidate** branch, if it doesn't already exist.
 ```console
 cd aws-iot-device-sdk-embedded-C
