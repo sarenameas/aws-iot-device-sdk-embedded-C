@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import subprocess
 import argparse
 import os
 import yaml
@@ -100,6 +99,9 @@ def validate_checks() -> list:
         else:
             # For each library submodule in this directory, get the status checks results and docs to review.
             for library in git_resp.json():
+                # if this is not a submodule, then skip it.
+                if library["type"] == "dir":
+                    continue
                 library_name = library["name"]
                 # Get the commit SHA of the branch currently in release-candidate.
                 commit_sha = library["sha"]
