@@ -1,0 +1,38 @@
+name: CSDK-Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_number:
+        description: 'Version Number (i.e. 202011.00)'
+        required: true
+        default: '202011.00'
+      corehttp_version:
+        description: 'coreHTTP version number'
+        required: true
+        default: 'v1.0.0'
+      corejson_version:
+        description: 'coreJSON version number'
+        required: true
+        default: 'v2.0.0'
+      coremqtt_version:
+        description: 'coreMQTT version number'
+        required: true
+        default: 'v1.0.1'
+      corepkcs11_version:
+        description: 'corePKCS11 version number'
+        required: true
+        default: 'v2.0.0'
+      defender_version:
+        description: 'Device Defender version number'
+        required: true
+        default: 'v1.0.0'
+      shadow_version:
+        description: "Device Shadow version number"
+        required: true
+        default: 'v1.0.1'
+      jobs_version:
+        description: "Jobs version number"
+        required: true
+        default: 'v1.0.1'
+

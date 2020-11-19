@@ -11,7 +11,7 @@ import re
 CSDK_LIBRARY_DIRS = ["libraries/aws", "libraries/standard"]
 
 # CSDK organization and repo constants
-CSDK_ORG = "aws"
+CSDK_ORG = "sarenameas"
 CSDK_REPO = "aws-iot-device-sdk-embedded-c"
 
 # Github API global. The Github API is used instead of pyGithub because some

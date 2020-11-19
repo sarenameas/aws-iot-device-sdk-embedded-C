@@ -53,7 +53,7 @@ You can also enter these as parameters to the script.
 
 1. Run the script with the versions of every library repo that exists under [libraries/aws](../../libraries/aws) and [libaries/standard](../../libraries/standard) directories.
 ```console
-python3 tools/release/release-verify.py \
+python3 tools/release/prerelease-verify.py \
 --root aws-iot-device-sdk-embedded-c \
 --csdk-version <CSDK_VERSION> \
 --coremqtt-version <MQTT_VERSION> \
