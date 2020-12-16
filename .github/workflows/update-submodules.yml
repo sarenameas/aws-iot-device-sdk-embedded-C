@@ -23,11 +23,13 @@ jobs:
       - name: Update the submodules
         run: |
           libs=$(find libraries/standard libraries/aws -maxdepth 1 -mindepth 1 | grep -v ${{ github.event.inputs.ignored }})
+          echo "libs=$libs" >> $GITHUB_ENV
           git submodule update --remote $libs
       - name: Commit changes and Push to remote
         run: |
           now="$(date +'%d-%m-%Y')"
           branch="updater-job/submodules-$now"
+          echo "branch=$branch" >> $GITHUB_ENV
           git checkout -b $branch
           git commit -am 'Updating library submodules to the latest.'
           git push --set-upstream origin $branch
@@ -35,5 +37,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo $branch
           gh pr create --base $branch --title 'Update library submodules to the latest' --body 'Update library submodules $lib'
