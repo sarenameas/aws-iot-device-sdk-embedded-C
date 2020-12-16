@@ -35,4 +35,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          echo $branch
           gh pr create --base $branch --title 'Update library submodules to the latest' --body 'Update library submodules $lib'
