@@ -24,7 +24,7 @@ jobs:
         run: |
           libs=$(find libraries/standard libraries/aws -maxdepth 1 -mindepth 1 | grep -v ${{ github.event.inputs.ignored }})
           git submodule update --remote $libs
-          echo "libs=$libs" >> $GITHUB_ENV
+          echo "libs=\"$libs\""" >> $GITHUB_ENV
       - name: Commit changes and Push to remote
         run: |
           now="$(date +'%d-%m-%Y')"
