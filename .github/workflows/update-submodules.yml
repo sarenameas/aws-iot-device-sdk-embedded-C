@@ -3,6 +3,10 @@ name: Update Library Submodules
 on:
   workflow_dispatch:
     inputs:
+      branch:
+        description: 'Target branch for raising PR'
+        required: true
+        default: main
       ignored:
         description: 'Regex pattern passed to `grep -v` to ignore in the path to the library, e.g. "ota\|jobs" ignores all libraries with "ota" or "jobs" in the name.'
         required: false
@@ -31,9 +35,8 @@ jobs:
           git checkout -b $branch
           git commit -am 'Updating library submodules to the latest.'
           git push --set-upstream origin $branch
-          echo "branch=$branch" >> $GITHUB_ENV
       - name: Raise a Pull-Request
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh pr create --base $branch --title 'Update library submodules to the latest' --body 'Update library submodules.'
+          gh pr create --base ${{ github.event.inputs.branch }} --title 'Update library submodules to the latest' --body 'Update library submodules.'
